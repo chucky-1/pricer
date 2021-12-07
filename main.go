@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/caarlos0/env/v6"
 	"github.com/chucky-1/pricer/internal/config"
+	"github.com/chucky-1/pricer/internal/consumer"
 	"github.com/chucky-1/pricer/internal/model"
-	"github.com/chucky-1/pricer/internal/repository"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
