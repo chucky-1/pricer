@@ -33,11 +33,27 @@ func (r *Consumer) listen(ch chan *model.Stock) {
 			log.Error(err)
 			return
 		}
-		id, _ := entries[0].Messages[0].Values["ID"].(string)
-		i, _ := strconv.Atoi(id)
-		title, _ := entries[0].Messages[0].Values["Title"].(string)
-		price, _ := entries[0].Messages[0].Values["Price"].(string)
-		p, _ := strconv.ParseFloat(price, 32)
+		m := entries[0].Messages[0].Values
+		id, ok := m["ID"].(string)
+		if !ok {
+			log.Error("id is missing")
+		}
+		i, err := strconv.Atoi(id)
+		if err != nil {
+			log.Error(err)
+		}
+		title, ok := m["Title"].(string)
+		if !ok {
+			log.Error("title is missing")
+		}
+		price, ok := m["Price"].(string)
+		if !ok {
+			log.Error("price is missing")
+		}
+		p, err := strconv.ParseFloat(price, 32)
+		if err != nil {
+			log.Error(err)
+		}
 		stock := model.Stock{
 			ID:    i,
 			Title: title,
