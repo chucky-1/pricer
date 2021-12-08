@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "github.com/chucky-1/pricer/protocol";
+
+package pgrpc;
+
+service Pricer {
+  rpc Get (stream Id) returns (stream Stock) {}
+}
+
+message Id {
+  int32 id = 1;
+}
+
+message Stock {
+  int32 id = 1;
+  string title = 2;
+  float price = 3;
+}

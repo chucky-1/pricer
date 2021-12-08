@@ -5,4 +5,7 @@ package config
 type Config struct {
 	Host string `env:"HOST" envDefault:"localhost"`
 	Port string `env:"PORT" envDefault:"6379"`
+
+	HostGrpc string `env:"HOST_GRPC" envDefault:"localhost"`
+	PortGrpc string `env:"PORT_GRPC" envDefault:"10000"`
 }

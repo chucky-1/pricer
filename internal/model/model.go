@@ -7,3 +7,6 @@ type Stock struct {
 	Title string  `validate:"required"`
 	Price float32 `validate:"required,gt=0"`
 }
+
+// Stocks simulates a database
+type Stocks map[int]*Stock
