@@ -8,5 +8,8 @@ type Stock struct {
 	Price float32 `validate:"required,gt=0"`
 }
 
-// Stocks simulates a database
-type Stocks map[int]*Stock
+// Channels contains collections of channels and condition of channels
+type Channels struct {
+	Active  map[int]bool
+	Collect map[int]chan *Stock
+}

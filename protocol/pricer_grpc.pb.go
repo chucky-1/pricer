@@ -18,7 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PricerClient interface {
-	Get(ctx context.Context, opts ...grpc.CallOption) (Pricer_GetClient, error)
+	Send(ctx context.Context, in *Id, opts ...grpc.CallOption) (Pricer_SendClient, error)
 }
 
 type pricerClient struct {
@@ -29,30 +29,31 @@ func NewPricerClient(cc grpc.ClientConnInterface) PricerClient {
 	return &pricerClient{cc}
 }
 
-func (c *pricerClient) Get(ctx context.Context, opts ...grpc.CallOption) (Pricer_GetClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Pricer_ServiceDesc.Streams[0], "/pgrpc.Pricer/Get", opts...)
+func (c *pricerClient) Send(ctx context.Context, in *Id, opts ...grpc.CallOption) (Pricer_SendClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Pricer_ServiceDesc.Streams[0], "/pgrpc.Pricer/Send", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pricerGetClient{stream}
+	x := &pricerSendClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	return x, nil
 }
 
-type Pricer_GetClient interface {
-	Send(*Id) error
+type Pricer_SendClient interface {
 	Recv() (*Stock, error)
 	grpc.ClientStream
 }
 
-type pricerGetClient struct {
+type pricerSendClient struct {
 	grpc.ClientStream
 }
 
-func (x *pricerGetClient) Send(m *Id) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *pricerGetClient) Recv() (*Stock, error) {
+func (x *pricerSendClient) Recv() (*Stock, error) {
 	m := new(Stock)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (x *pricerGetClient) Recv() (*Stock, error) {
 // All implementations must embed UnimplementedPricerServer
 // for forward compatibility
 type PricerServer interface {
-	Get(Pricer_GetServer) error
+	Send(*Id, Pricer_SendServer) error
 	mustEmbedUnimplementedPricerServer()
 }
 
@@ -72,8 +73,8 @@ type PricerServer interface {
 type UnimplementedPricerServer struct {
 }
 
-func (UnimplementedPricerServer) Get(Pricer_GetServer) error {
-	return status.Errorf(codes.Unimplemented, "method Get not implemented")
+func (UnimplementedPricerServer) Send(*Id, Pricer_SendServer) error {
+	return status.Errorf(codes.Unimplemented, "method Send not implemented")
 }
 func (UnimplementedPricerServer) mustEmbedUnimplementedPricerServer() {}
 
@@ -88,30 +89,25 @@ func RegisterPricerServer(s grpc.ServiceRegistrar, srv PricerServer) {
 	s.RegisterService(&Pricer_ServiceDesc, srv)
 }
 
-func _Pricer_Get_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PricerServer).Get(&pricerGetServer{stream})
-}
-
-type Pricer_GetServer interface {
-	Send(*Stock) error
-	Recv() (*Id, error)
-	grpc.ServerStream
-}
-
-type pricerGetServer struct {
-	grpc.ServerStream
-}
-
-func (x *pricerGetServer) Send(m *Stock) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *pricerGetServer) Recv() (*Id, error) {
+func _Pricer_Send_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(Id)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	return m, nil
+	return srv.(PricerServer).Send(m, &pricerSendServer{stream})
+}
+
+type Pricer_SendServer interface {
+	Send(*Stock) error
+	grpc.ServerStream
+}
+
+type pricerSendServer struct {
+	grpc.ServerStream
+}
+
+func (x *pricerSendServer) Send(m *Stock) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 // Pricer_ServiceDesc is the grpc.ServiceDesc for Pricer service.
@@ -123,11 +119,10 @@ var Pricer_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Get",
-			Handler:       _Pricer_Get_Handler,
+			StreamName:    "Send",
+			Handler:       _Pricer_Send_Handler,
 			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
-	Metadata: "protocol/pricer.proto",
+	Metadata: "pricer.proto",
 }

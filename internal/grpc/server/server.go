@@ -4,8 +4,7 @@ package server
 import (
 	"github.com/chucky-1/pricer/internal/repository"
 	"github.com/chucky-1/pricer/protocol"
-
-	"io"
+	log "github.com/sirupsen/logrus"
 )
 
 // Server contains methods of application on service side
@@ -19,30 +18,22 @@ func NewServer(rep *repository.Repository) *Server {
 	return &Server{rep: rep}
 }
 
-// Get func takes an element from database
-func (s *Server) Get(stream protocol.Pricer_GetServer) error {
+// Send listens on the channel and sends data to the client
+func (s *Server) Send(id *protocol.Id, stream protocol.Pricer_SendServer) error {
+	ch, err := s.rep.Send(int(id.Id))
+	if err != nil {
+		return err
+	}
 	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		get, err := s.rep.Get(int(in.Id))
-		if err != nil {
-			return err
-		}
-
+		st := <-ch
 		stock := protocol.Stock{
-			Id:    int32(get.ID),
-			Title: get.Title,
-			Price: get.Price,
+			Id:    int32(st.ID),
+			Title: st.Title,
+			Price: st.Price,
 		}
-		err = stream.Send(&stock)
+		err := stream.Send(&stock)
 		if err != nil {
-			return err
+			log.Error(err)
 		}
 	}
 }
