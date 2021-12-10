@@ -9,6 +9,11 @@ type Stock struct {
 }
 
 // Channels contains collections of channels and condition of channels
+// Chan is map[Stock.ID]map[ChanID]
+// ChanID is map[Stock.ID]
+// UserID key is userID, value is ChanID
 type Channels struct {
-	Chan map[int][]chan *Stock
+	Chan   map[int]map[int]chan *Stock
+	ChanID map[int]int
+	UserID map[int]int
 }

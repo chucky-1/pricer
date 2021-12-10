@@ -27,17 +27,37 @@ func NewRepository(rdb *redis.Client, channels *model.Channels, ch chan *model.S
 }
 
 // Send activates the stream, changing the flag to true
-func (r *Repository) Send(id int) (chan *model.Stock, error) {
+func (r *Repository) Send(stockID, userID int) (chan *model.Stock, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	list, ok := r.channels.Chan[id]
+	mapChan, ok := r.channels.Chan[stockID]
 	if !ok {
 		return nil, errors.New("stock didn't find")
 	}
+	chanID := r.channels.ChanID[stockID]
+	r.channels.ChanID[stockID]++
 	ch := make(chan *model.Stock)
-	list = append(list, ch)
-	r.channels.Chan[id] = list
+	mapChan[chanID] = ch
+	r.channels.Chan[stockID] = mapChan
+	r.channels.UserID[userID] = chanID
 	return ch, nil
+}
+
+// Close func closes the channel and delete it from map
+func (r *Repository) Close(stockID, userID int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	stock, ok := r.channels.Chan[stockID]
+	if !ok {
+		return errors.New("stock not found when closing")
+	}
+	chanID := r.channels.UserID[userID]
+	ch := stock[chanID]
+
+	close(ch)
+	delete(r.channels.Chan[stockID], chanID)
+	delete(r.channels.UserID, userID)
+	return nil
 }
 
 // listen func listens redis stream and sends shares to the channel if it is active
@@ -80,11 +100,12 @@ func listen(rdb *redis.Client, ch chan *model.Stock, channels *model.Channels) {
 		}
 		ch <- &stock
 
-		list, ok := channels.Chan[stock.ID]
+		mapChan, ok := channels.Chan[stock.ID]
 		if !ok {
-			channels.Chan[stock.ID] = []chan *model.Stock{}
+			channels.Chan[stock.ID] = map[int]chan *model.Stock{}
+			channels.ChanID[stock.ID] = 1
 		} else {
-			for _, chStock := range list {
+			for _, chStock := range mapChan {
 				chStock <- &stock
 			}
 		}
