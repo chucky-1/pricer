@@ -32,8 +32,7 @@ func main() {
 
 	// Initial dependencies
 	channels := model.Channels{
-		Active:  make(map[int]bool),
-		Collect: make(map[int]chan *model.Stock),
+		Chan: map[int][]chan *model.Stock{},
 	}
 	ch := make(chan *model.Stock)
 	rep := repository.NewRepository(rdb, &channels, ch)

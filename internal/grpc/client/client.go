@@ -22,7 +22,7 @@ func main() {
 	}(conn)
 	client := protocol.NewPricerClient(conn)
 
-	id := protocol.Id{Id: int32(4)}
+	id := protocol.Id{Id: int32(1)}
 
 	stream, err := client.Send(context.Background(), &id)
 	if err != nil {

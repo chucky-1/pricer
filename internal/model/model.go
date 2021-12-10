@@ -10,6 +10,5 @@ type Stock struct {
 
 // Channels contains collections of channels and condition of channels
 type Channels struct {
-	Active  map[int]bool
-	Collect map[int]chan *Stock
+	Chan map[int][]chan *Stock
 }

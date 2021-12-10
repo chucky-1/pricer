@@ -31,7 +31,7 @@ func (s *Server) Send(id *protocol.Id, stream protocol.Pricer_SendServer) error 
 			Title: st.Title,
 			Price: st.Price,
 		}
-		err := stream.Send(&stock)
+		err = stream.Send(&stock)
 		if err != nil {
 			log.Error(err)
 		}
