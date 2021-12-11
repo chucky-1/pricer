@@ -4,31 +4,29 @@ package server
 import (
 	"github.com/chucky-1/pricer/internal/repository"
 	"github.com/chucky-1/pricer/protocol"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"errors"
-	"sync"
 )
 
 // Server contains methods of application on service side
 type Server struct {
 	protocol.UnimplementedPricerServer
 	rep    *repository.Repository
-	userID int
-	mu     sync.Mutex
 }
 
 // NewServer is constructor
 func NewServer(rep *repository.Repository) *Server {
-	return &Server{rep: rep, userID: 1}
+	return &Server{rep: rep}
 }
 
 // Send listens on the channel and sends data to the client
 func (s *Server) Send(id *protocol.Id, stream protocol.Pricer_SendServer) error {
-	s.mu.Lock()
-	userID := s.userID
-	s.userID++
-	s.mu.Unlock()
+	userID := uuid.New().String()
+	if userID == "" {
+		return errors.New("UserID didn't generate")
+	}
 	ch, err := s.rep.Send(int(id.Id), userID)
 	if err != nil {
 		return err

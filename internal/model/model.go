@@ -15,5 +15,5 @@ type Stock struct {
 type Channels struct {
 	Chan   map[int]map[int]chan *Stock
 	ChanID map[int]int
-	UserID map[int]int
+	UserID map[string]int
 }

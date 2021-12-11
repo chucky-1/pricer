@@ -27,7 +27,7 @@ func NewRepository(rdb *redis.Client, channels *model.Channels, ch chan *model.S
 }
 
 // Send activates the stream, changing the flag to true
-func (r *Repository) Send(stockID, userID int) (chan *model.Stock, error) {
+func (r *Repository) Send(stockID int, userID string) (chan *model.Stock, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	mapChan, ok := r.channels.Chan[stockID]
@@ -44,7 +44,7 @@ func (r *Repository) Send(stockID, userID int) (chan *model.Stock, error) {
 }
 
 // Close func closes the channel and delete it from map
-func (r *Repository) Close(stockID, userID int) error {
+func (r *Repository) Close(stockID int, userID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	stock, ok := r.channels.Chan[stockID]

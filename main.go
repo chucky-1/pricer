@@ -34,7 +34,7 @@ func main() {
 	channels := model.Channels{
 		Chan:   map[int]map[int]chan *model.Stock{},
 		ChanID: map[int]int{},
-		UserID: map[int]int{},
+		UserID: map[string]int{},
 	}
 	ch := make(chan *model.Stock)
 	rep := repository.NewRepository(rdb, &channels, ch)

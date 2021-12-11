@@ -17,3 +17,7 @@ message Stock {
   string title = 2;
   float price = 3;
 }
+
+message dsd {
+  Stock cxc = 1;
+}
