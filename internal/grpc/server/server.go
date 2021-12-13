@@ -13,7 +13,7 @@ import (
 // Server contains methods of application on service side
 type Server struct {
 	protocol.UnimplementedPricerServer
-	rep    *repository.Repository
+	rep *repository.Repository
 }
 
 // NewServer is constructor
@@ -22,12 +22,16 @@ func NewServer(rep *repository.Repository) *Server {
 }
 
 // Send listens on the channel and sends data to the client
-func (s *Server) Send(id *protocol.Id, stream protocol.Pricer_SendServer) error {
+func (s *Server) Send(listID *protocol.ListID, stream protocol.Pricer_SendServer) error {
 	userID := uuid.New().String()
 	if userID == "" {
 		return errors.New("UserID didn't generate")
 	}
-	ch, err := s.rep.Send(int(id.Id), userID)
+	var list []int
+	for _, id := range listID.Id {
+		list = append(list, int(id))
+	}
+	ch, err := s.rep.Send(list, userID)
 	if err != nil {
 		return err
 	}
@@ -42,7 +46,7 @@ func (s *Server) Send(id *protocol.Id, stream protocol.Pricer_SendServer) error 
 		if err != nil {
 			switch {
 			case err.Error() == "rpc error: code = Unavailable desc = transport is closing":
-				err = s.rep.Close(int(id.Id), userID)
+				err = s.rep.Close(userID)
 				if err != nil {
 					log.Error(err)
 				} else {

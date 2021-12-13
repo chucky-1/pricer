@@ -18,7 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PricerClient interface {
-	Send(ctx context.Context, in *Id, opts ...grpc.CallOption) (Pricer_SendClient, error)
+	Send(ctx context.Context, in *ListID, opts ...grpc.CallOption) (Pricer_SendClient, error)
 }
 
 type pricerClient struct {
@@ -29,7 +29,7 @@ func NewPricerClient(cc grpc.ClientConnInterface) PricerClient {
 	return &pricerClient{cc}
 }
 
-func (c *pricerClient) Send(ctx context.Context, in *Id, opts ...grpc.CallOption) (Pricer_SendClient, error) {
+func (c *pricerClient) Send(ctx context.Context, in *ListID, opts ...grpc.CallOption) (Pricer_SendClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Pricer_ServiceDesc.Streams[0], "/pgrpc.Pricer/Send", opts...)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (x *pricerSendClient) Recv() (*Stock, error) {
 // All implementations must embed UnimplementedPricerServer
 // for forward compatibility
 type PricerServer interface {
-	Send(*Id, Pricer_SendServer) error
+	Send(*ListID, Pricer_SendServer) error
 	mustEmbedUnimplementedPricerServer()
 }
 
@@ -73,7 +73,7 @@ type PricerServer interface {
 type UnimplementedPricerServer struct {
 }
 
-func (UnimplementedPricerServer) Send(*Id, Pricer_SendServer) error {
+func (UnimplementedPricerServer) Send(*ListID, Pricer_SendServer) error {
 	return status.Errorf(codes.Unimplemented, "method Send not implemented")
 }
 func (UnimplementedPricerServer) mustEmbedUnimplementedPricerServer() {}
@@ -90,7 +90,7 @@ func RegisterPricerServer(s grpc.ServiceRegistrar, srv PricerServer) {
 }
 
 func _Pricer_Send_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Id)
+	m := new(ListID)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

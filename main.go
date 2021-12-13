@@ -14,6 +14,7 @@ import (
 
 	"fmt"
 	"net"
+	"sync"
 )
 
 func main() {
@@ -31,13 +32,16 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: hostAndPort})
 
 	// Initial dependencies
-	channels := model.Channels{
-		Chan:   map[int]map[int]chan *model.Stock{},
-		ChanID: map[int]int{},
-		UserID: map[string]int{},
+	sub := model.Subscribers{
+		Users: make(map[string]*model.User),
+	}
+	memory := model.Memory{
+		User: make(map[string]*model.User),
+		Sub:  make(map[int]*model.Subscribers),
 	}
 	ch := make(chan *model.Stock)
-	rep := repository.NewRepository(rdb, &channels, ch)
+	mu := new(sync.Mutex)
+	rep := repository.NewRepository(rdb, &sub, &memory, mu, ch)
 
 	// Grpc
 	go func() {

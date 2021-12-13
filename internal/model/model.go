@@ -8,12 +8,25 @@ type Stock struct {
 	Price float32 `validate:"required,gt=0"`
 }
 
-// Channels contains collections of channels and condition of channels
-// Chan is map[Stock.ID]map[ChanID]
-// ChanID is map[Stock.ID]
-// UserID key is userID, value is ChanID
-type Channels struct {
-	Chan   map[int]map[int]chan *Stock
-	ChanID map[int]int
-	UserID map[string]int
+// User struck
+// Stocks is list of ID of Stock to which the user is subscribed
+type User struct {
+	ID     string
+	Chan   chan *Stock
+	Stocks []int
+}
+
+// Subscribers struct. It shows which users are subscribed to each stock
+// Users is map[User.ID]
+type Subscribers struct {
+	StockID int
+	Users   map[string]*User
+}
+
+// Memory struct
+// User is map[User.ID]
+// Sub is map[Subscribers.StockID]
+type Memory struct {
+	User map[string]*User
+	Sub  map[int]*Subscribers
 }

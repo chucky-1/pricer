@@ -22,9 +22,14 @@ func main() {
 	}(conn)
 	client := protocol.NewPricerClient(conn)
 
-	id := protocol.Id{Id: int32(1)}
+	listID := protocol.ListID{
+		Id: []int32{},
+	}
+	listID.Id = append(listID.Id, int32(1))
+	listID.Id = append(listID.Id, int32(2))
+	listID.Id = append(listID.Id, int32(3))
 
-	stream, err := client.Send(context.Background(), &id)
+	stream, err := client.Send(context.Background(), &listID)
 	if err != nil {
 		log.Error("Error for Send")
 	}
@@ -33,6 +38,6 @@ func main() {
 		if err != nil {
 			return
 		}
-		log.Infof("%s, %f", recv.Title, recv.Price)
+		log.Infof("%s is update, new cost is %f", recv.Title, recv.Price)
 	}
 }
