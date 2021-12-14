@@ -10,6 +10,7 @@ import (
 	"errors"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // Repository contains redis client and channels. All channels contain an activity flag
@@ -53,6 +54,29 @@ func (r *Repository) Send(list []int, userID string) (chan *model.Stock, error) 
 		}
 	}
 	r.memory.User[userID] = &user
+
+	// sends primary values from the database on client connection
+	go func(rdb *redis.Client, stocks []int, ch chan *model.Stock) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		for _, id := range stocks {
+			lastPrice, err := rdb.Get(ctx, strconv.Itoa(id)).Result()
+			if err != nil {
+				log.Error(err)
+			}
+			value, err := strconv.ParseFloat(lastPrice, 32)
+			if err != nil {
+				log.Error(err)
+			}
+			v := float32(value)
+			stock := model.Stock{
+				ID:    id,
+				Title: "unknown",
+				Price: v,
+			}
+			ch <-&stock
+		}
+	}(r.rdb, user.Stocks, user.Chan)
 	return user.Chan, nil
 }
 
@@ -115,8 +139,15 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			Title: title,
 			Price: float32(p),
 		}
+
 		ch <- &stock
 
+		err = update(rdb, id, stock.Price)
+		if err != nil {
+			log.Error(err)
+		}
+
+		// Send the price in the channels
 		sub, ok := memory.Sub[stock.ID]
 		if ok {
 			for _, user := range sub.Users {
@@ -124,4 +155,16 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			}
 		}
 	}
+}
+
+// update func updates the latest price in the database
+func update(rdb *redis.Client, id string, price float32) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err := rdb.Set(ctx, id, price, 0).Err()
+	if err != nil {
+		log.Errorf("%s Price %f didn't update", time.Now().String(), price)
+		return err
+	}
+	return nil
 }

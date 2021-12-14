@@ -1,11 +1,10 @@
 package main
 
 import (
+	"context"
 	"github.com/chucky-1/pricer/protocol"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-
-	"context"
 )
 
 // This is a test implementation of the client. This file will be removed.
@@ -28,7 +27,6 @@ func main() {
 	listID.Id = append(listID.Id, int32(1))
 	listID.Id = append(listID.Id, int32(2))
 	listID.Id = append(listID.Id, int32(3))
-
 	stream, err := client.Send(context.Background(), &listID)
 	if err != nil {
 		log.Error("Error for Send")
