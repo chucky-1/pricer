@@ -74,7 +74,7 @@ func (r *Repository) Send(list []int, userID string) (chan *model.Stock, error) 
 				Title: "unknown",
 				Price: v,
 			}
-			ch <-&stock
+			ch <- &stock
 		}
 	}(r.rdb, user.Stocks, user.Chan)
 	return user.Chan, nil
@@ -103,9 +103,10 @@ func (r *Repository) Close(userID string) error {
 
 // listen func listens redis stream and sends shares to the channel if it is active
 func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *model.Stock) {
+	var nextID = "$"
 	for {
 		entries, err := rdb.XRead(context.Background(), &redis.XReadArgs{
-			Streams: []string{"stream", "$"},
+			Streams: []string{"stream", nextID},
 			Count:   1,
 			Block:   0,
 		}).Result()
@@ -113,6 +114,7 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			log.Error(err)
 			return
 		}
+		nextID = entries[0].Messages[0].ID
 		m := entries[0].Messages[0].Values
 		id, ok := m["ID"].(string)
 		if !ok {
