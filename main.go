@@ -65,7 +65,7 @@ func main() {
 		if err != nil {
 			log.Error("Struct isn't valid")
 		} else {
-			log.Infof("%s is update, new cost is %f", stock.Title, stock.Price)
+			log.Infof("%s is update, new cost is %f, update %s", stock.Title, stock.Price, stock.Update)
 		}
 	}
 }

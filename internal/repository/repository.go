@@ -115,6 +115,10 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			return
 		}
 		nextID = entries[0].Messages[0].ID
+		t, err := getTimeFromID(nextID)
+		if err != nil {
+			log.Error(err)
+		}
 		m := entries[0].Messages[0].Values
 		id, ok := m["ID"].(string)
 		if !ok {
@@ -137,9 +141,10 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			log.Error(err)
 		}
 		stock := model.Stock{
-			ID:    i,
-			Title: title,
-			Price: float32(p),
+			ID:     i,
+			Title:  title,
+			Price:  float32(p),
+			Update: t,
 		}
 
 		ch <- &stock
@@ -169,4 +174,13 @@ func update(rdb *redis.Client, id string, price float32) error {
 		return err
 	}
 	return nil
+}
+
+func getTimeFromID(id string) (time.Time, error) {
+	mkr, err := strconv.Atoi(id[:len(id)-2])
+	if err != nil {
+		return time.Time{}, err
+	}
+	t := time.Unix(int64(mkr)/1000, 0)
+	return t, nil
 }
