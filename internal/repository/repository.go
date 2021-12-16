@@ -15,16 +15,15 @@ import (
 // Repository contains redis client and channels. All channels contain an activity flag
 type Repository struct {
 	rdb   *redis.Client
-	mu    *sync.Mutex
+	mu    *sync.RWMutex
 	stock map[int32]map[string]chan *model.Stock // map[Stock ID]grpc
 }
 
 // NewRepository is constructor
 func NewRepository(rdb *redis.Client, ch chan *model.Stock) *Repository {
-	mu := new(sync.Mutex)
-	stock := make(map[int32]map[string]chan *model.Stock)
-	rep := Repository{rdb: rdb, mu: mu, stock: stock}
-	go listen(rdb, stock, mu, ch)
+	mu := new(sync.RWMutex)
+	rep := Repository{rdb: rdb, mu: mu, stock: make(map[int32]map[string]chan *model.Stock)}
+	go rep.listen(ch)
 	return &rep
 }
 
@@ -76,6 +75,8 @@ func sendPrimaryValues(rdb *redis.Client, stocks []int32, ch chan *model.Stock) 
 
 // Close func closes the channel and delete it from map
 func (r *Repository) Close(grpcID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	var ch chan *model.Stock
 	for _, stock := range r.stock {
 		c, ok := stock[grpcID]
@@ -93,10 +94,10 @@ func (r *Repository) Close(grpcID string) error {
 }
 
 // listen func listens redis stream and sends shares to the channel if it is active
-func listen(rdb *redis.Client, mm map[int32]map[string]chan *model.Stock, mu *sync.Mutex, ch chan *model.Stock) {
+func (r *Repository)listen(ch chan *model.Stock) {
 	var nextID = "$"
 	for {
-		entries, err := rdb.XRead(context.Background(), &redis.XReadArgs{
+		entries, err := r.rdb.XRead(context.Background(), &redis.XReadArgs{
 			Streams: []string{"stream", nextID},
 			Count:   1,
 			Block:   0,
@@ -140,14 +141,16 @@ func listen(rdb *redis.Client, mm map[int32]map[string]chan *model.Stock, mu *sy
 
 		ch <- &stock
 
-		err = update(rdb, id, stock.Price)
+		err = update(r.rdb, id, stock.Price)
 		if err != nil {
 			log.Error(err)
 		}
 
 		// Send the price in the channels
 		go func() {
-			grpc, ok := mm[stock.ID]
+			r.mu.RLock()
+			defer r.mu.RUnlock()
+			grpc, ok := r.stock[stock.ID]
 			if ok {
 				for _, c := range grpc {
 					c <- &stock

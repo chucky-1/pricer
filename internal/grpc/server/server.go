@@ -31,13 +31,11 @@ func (s *Server) Send(listID *protocol.ListID, stream protocol.Pricer_SendServer
 	for {
 		select {
 		case <-stream.Context().Done():
-			go func() {
-				grpc := protocol.GrpcID{Id: grpcID}
-				_, err = s.Close(context.Background(), &grpc)
-				if err != nil {
-					log.Error(err)
-				}
-			}()
+			grpc := protocol.GrpcID{Id: grpcID}
+			_, err = s.Close(context.Background(), &grpc)
+			if err != nil {
+				log.Error(err)
+			}
 			return stream.Context().Err()
 		case st := <-ch:
 			stock := protocol.Stock{
