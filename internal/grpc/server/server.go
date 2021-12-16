@@ -6,6 +6,8 @@ import (
 	"github.com/chucky-1/pricer/protocol"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+
+	"context"
 )
 
 // Server contains methods of application on service side
@@ -21,44 +23,41 @@ func NewServer(rep *repository.Repository) *Server {
 
 // Send listens on the channel and sends data to the client
 func (s *Server) Send(listID *protocol.ListID, stream protocol.Pricer_SendServer) error {
-	select {
-	case <-stream.Context().Done():
-		return stream.Context().Err()
-	default:
-		userID := uuid.New().String()
-		if userID == "" {
-			log.Error("UserID didn't generate")
-		}
-		var list []int
-		for _, id := range listID.Id {
-			list = append(list, int(id))
-		}
-		ch, err := s.rep.Send(list, userID)
-		if err != nil {
-			log.Error(err)
-		}
-		for {
-			st := <-ch
+	grpcID := uuid.New().String()
+	ch, err := s.rep.Send(listID.Id, grpcID)
+	if err != nil {
+		log.Error(err)
+	}
+	for {
+		select {
+		case <-stream.Context().Done():
+			go func() {
+				grpc := protocol.GrpcID{Id: grpcID}
+				_, err = s.Close(context.Background(), &grpc)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+			return stream.Context().Err()
+		case st := <-ch:
 			stock := protocol.Stock{
-				Id:    int32(st.ID),
+				Id:    st.ID,
 				Title: st.Title,
 				Price: st.Price,
 			}
 			err = stream.Send(&stock)
 			if err != nil {
-				switch {
-				case err.Error() == "rpc error: code = Unavailable desc = transport is closing":
-					err = s.rep.Close(userID)
-					if err != nil {
-						log.Error(err)
-					} else {
-						log.Infof("client %s exit", userID)
-						return nil
-					}
-				default:
-					log.Error(err)
-				}
+				log.Error(err)
 			}
 		}
 	}
+}
+
+// Close func called when the client exits
+func (s *Server) Close(ctx context.Context, grpcID *protocol.GrpcID) (*protocol.Response, error) {
+	err := s.rep.Close(grpcID.Id)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }

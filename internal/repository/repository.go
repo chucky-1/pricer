@@ -7,7 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"context"
-	"errors"
 	"strconv"
 	"sync"
 	"time"
@@ -15,94 +14,86 @@ import (
 
 // Repository contains redis client and channels. All channels contain an activity flag
 type Repository struct {
-	rdb    *redis.Client
-	sub    *model.Subscribers
-	memory *model.Memory
-	mu     *sync.Mutex
+	rdb   *redis.Client
+	mu    *sync.Mutex
+	stock map[int32]map[string]chan *model.Stock // map[Stock ID]grpc
 }
 
 // NewRepository is constructor
-func NewRepository(rdb *redis.Client, sub *model.Subscribers, memory *model.Memory, mu *sync.Mutex, ch chan *model.Stock) *Repository {
-	rep := Repository{rdb: rdb, sub: sub, memory: memory, mu: mu}
-	go listen(rdb, memory, mu, ch)
+func NewRepository(rdb *redis.Client, ch chan *model.Stock) *Repository {
+	mu := new(sync.Mutex)
+	stock := make(map[int32]map[string]chan *model.Stock)
+	rep := Repository{rdb: rdb, mu: mu, stock: stock}
+	go listen(rdb, stock, mu, ch)
 	return &rep
 }
 
 // Send activates the stream, changing the flag to true
-func (r *Repository) Send(list []int, userID string) (chan *model.Stock, error) {
+func (r *Repository) Send(list []int32, grpcID string) (chan *model.Stock, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	user := model.User{
-		ID:     userID,
-		Chan:   make(chan *model.Stock),
-		Stocks: []int{},
-	}
-	for _, id := range list {
-		user.Stocks = append(user.Stocks, id)
-
-		s, ok := r.memory.Sub[id]
+	ch := make(chan *model.Stock)
+	for _, stockID := range list {
+		grpc, ok := r.stock[stockID]
 		if !ok {
-			newSub := model.Subscribers{
-				StockID: id,
-				Users:   make(map[string]*model.User),
-			}
-			newSub.Users[user.ID] = &user
-			r.memory.Sub[id] = &newSub
-		} else {
-			s.Users[user.ID] = &user
-			r.memory.Sub[id] = s
+			r.stock[stockID] = make(map[string]chan *model.Stock)
+			grpc = r.stock[stockID]
 		}
+		grpc[grpcID] = ch
 	}
-	r.memory.User[userID] = &user
-
-	// sends primary values from the database on client connection
-	go func(rdb *redis.Client, stocks []int, ch chan *model.Stock) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		for _, id := range stocks {
-			lastPrice, err := rdb.Get(ctx, strconv.Itoa(id)).Result()
-			if err != nil {
-				log.Error(err)
-			}
-			value, err := strconv.ParseFloat(lastPrice, 32)
-			if err != nil {
-				log.Error(err)
-			}
-			v := float32(value)
-			stock := model.Stock{
-				ID:    id,
-				Title: "unknown",
-				Price: v,
-			}
-			ch <- &stock
+	go func() {
+		err := sendPrimaryValues(r.rdb, list, ch)
+		if err != nil {
+			log.Error(err)
 		}
-	}(r.rdb, user.Stocks, user.Chan)
-	return user.Chan, nil
+	}()
+	return ch, nil
+}
+
+// Send primary values from the database on client connection
+func sendPrimaryValues(rdb *redis.Client, stocks []int32, ch chan *model.Stock) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for _, id := range stocks {
+		lastPrice, err := rdb.Get(ctx, strconv.Itoa(int(id))).Result()
+		if err != nil {
+			return err
+		}
+		value, err := strconv.ParseFloat(lastPrice, 32)
+		if err != nil {
+			return err
+		}
+		v := float32(value)
+		stock := model.Stock{
+			ID:    id,
+			Title: "unknown",
+			Price: v,
+		}
+		ch <- &stock
+	}
+	return nil
 }
 
 // Close func closes the channel and delete it from map
-func (r *Repository) Close(userID string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	user, ok := r.memory.User[userID]
-	if !ok {
-		return errors.New("chan didn't find")
-	}
-
-	for _, stockID := range user.Stocks {
-		s, ok := r.memory.Sub[stockID]
-		if !ok {
-			continue
+func (r *Repository) Close(grpcID string) error {
+	var ch chan *model.Stock
+	for _, stock := range r.stock {
+		c, ok := stock[grpcID]
+		if ok {
+			ch = c
+			delete(stock, grpcID)
+			break
 		}
-		delete(s.Users, user.ID)
-		r.memory.Sub[stockID] = s
 	}
-	close(user.Chan)
+	for _, stock := range r.stock {
+		delete(stock, grpcID)
+	}
+	close(ch)
 	return nil
 }
 
 // listen func listens redis stream and sends shares to the channel if it is active
-func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *model.Stock) {
+func listen(rdb *redis.Client, mm map[int32]map[string]chan *model.Stock, mu *sync.Mutex, ch chan *model.Stock) {
 	var nextID = "$"
 	for {
 		entries, err := rdb.XRead(context.Background(), &redis.XReadArgs{
@@ -141,7 +132,7 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 			log.Error(err)
 		}
 		stock := model.Stock{
-			ID:     i,
+			ID:     int32(i),
 			Title:  title,
 			Price:  float32(p),
 			Update: t,
@@ -155,12 +146,14 @@ func listen(rdb *redis.Client, memory *model.Memory, mu *sync.Mutex, ch chan *mo
 		}
 
 		// Send the price in the channels
-		sub, ok := memory.Sub[stock.ID]
-		if ok {
-			for _, user := range sub.Users {
-				user.Chan <- &stock
+		go func() {
+			grpc, ok := mm[stock.ID]
+			if ok {
+				for _, c := range grpc {
+					c <- &stock
+				}
 			}
-		}
+		}()
 	}
 }
 
@@ -170,7 +163,6 @@ func update(rdb *redis.Client, id string, price float32) error {
 	defer cancel()
 	err := rdb.Set(ctx, id, price, 0).Err()
 	if err != nil {
-		log.Errorf("%s Price %f didn't update", time.Now().String(), price)
 		return err
 	}
 	return nil

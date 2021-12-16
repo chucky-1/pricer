@@ -6,6 +6,7 @@ package pgrpc;
 
 service Pricer {
   rpc Send(ListID) returns (stream Stock) {}
+  rpc Close(GrpcID) returns (Response) {}
 }
 
 message Stock {
@@ -17,3 +18,9 @@ message Stock {
 message ListID {
   repeated int32 id = 1;
 }
+
+message GrpcID {
+  string id = 1;
+}
+
+message Response {}
