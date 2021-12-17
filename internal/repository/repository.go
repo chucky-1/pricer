@@ -28,7 +28,7 @@ func NewRepository(rdb *redis.Client, ch chan *model.Stock) *Repository {
 }
 
 // Send activates the stream, changing the flag to true
-func (r *Repository) Send(list []int32, grpcID string, ch chan *model.Stock) (chan *model.Stock, error) {
+func (r *Repository) Send(list []int32, grpcID string, ch chan *model.Stock) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, stockID := range list {
@@ -45,27 +45,11 @@ func (r *Repository) Send(list []int32, grpcID string, ch chan *model.Stock) (ch
 			log.Error(err)
 		}
 	}()
-	return ch, nil
 }
 
 // Add func additionally subscribes to one or more stocks
 func (r *Repository) Add(list []int32, grpcID string, ch chan *model.Stock) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, stockID := range list {
-		grpc, ok := r.stock[stockID]
-		if !ok {
-			r.stock[stockID] = make(map[string]chan *model.Stock)
-			grpc = r.stock[stockID]
-		}
-		grpc[grpcID] = ch
-	}
-	go func() {
-		err := sendPrimaryValues(r.rdb, list, ch)
-		if err != nil {
-			log.Error(err)
-		}
-	}()
+	r.Send(list, grpcID, ch)
 }
 
 // Del func unsubscribes from one or more stocks. It doesn't close the channel!

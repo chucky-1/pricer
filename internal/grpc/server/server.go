@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"context"
+	"errors"
 )
 
 // Server contains methods of application on service side
@@ -27,53 +28,61 @@ func (s *Server) Send(stream protocol.Pricer_SendServer) error {
 	grpcID := uuid.New().String()
 	internalChan := make(chan *protocol.StockID)
 	externalChan := make(chan *model.Stock)
-	go func() {
-		select {
-		case <-stream.Context().Done():
-			return
-		default:
+
+	recv, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	if recv.Act == "INIT" {
+		s.rep.Send(recv.List, grpcID, externalChan)
+		go func() {
 			for {
-				recv, err := stream.Recv()
+				st, ok := <-externalChan
+				if !ok {
+					break
+				}
+				stock := protocol.Stock{
+					Id:    st.ID,
+					Title: st.Title,
+					Price: st.Price,
+				}
+				err = stream.Send(&stock)
 				if err != nil {
 					log.Error(err)
+				}
+			}
+		}()
+	} else {
+		return errors.New("init not made")
+	}
+
+	go func() {
+		for {
+			select {
+			case <-stream.Context().Done():
+				return
+			default:
+				recv, err = stream.Recv()
+				if err != nil {
+					log.Error(err)
+					continue
 				}
 				internalChan <- recv
 			}
 		}
 	}()
+
 	for {
 		select {
 		case <-stream.Context().Done():
 			grpc := protocol.GrpcID{Id: grpcID}
-			_, err := s.Close(context.Background(), &grpc)
+			_, err = s.Close(context.Background(), &grpc)
 			if err != nil {
 				log.Error(err)
 			}
 			return stream.Context().Err()
-		case recv := <-internalChan:
+		case recv = <-internalChan:
 			switch {
-			case recv.Act == "INIT":
-				ch, err := s.rep.Send(recv.List, grpcID, externalChan)
-				if err != nil {
-					log.Error(err)
-				}
-				go func() {
-					for {
-						st, ok := <-ch
-						if !ok {
-							break
-						}
-						stock := protocol.Stock{
-							Id:    st.ID,
-							Title: st.Title,
-							Price: st.Price,
-						}
-						err = stream.Send(&stock)
-						if err != nil {
-							log.Error(err)
-						}
-					}
-				}()
 			case recv.Act == "ADD":
 				s.rep.Add(recv.List, grpcID, externalChan)
 			case recv.Act == "DEL":
