@@ -2,6 +2,7 @@
 package server
 
 import (
+	"github.com/chucky-1/pricer/internal/model"
 	"github.com/chucky-1/pricer/internal/repository"
 	"github.com/chucky-1/pricer/protocol"
 	"github.com/google/uuid"
@@ -22,30 +23,61 @@ func NewServer(rep *repository.Repository) *Server {
 }
 
 // Send listens on the channel and sends data to the client
-func (s *Server) Send(listID *protocol.ListID, stream protocol.Pricer_SendServer) error {
+func (s *Server) Send(stream protocol.Pricer_SendServer) error {
 	grpcID := uuid.New().String()
-	ch, err := s.rep.Send(listID.Id, grpcID)
-	if err != nil {
-		log.Error(err)
-	}
+	internalChan := make(chan *protocol.StockID)
+	externalChan := make(chan *model.Stock)
+	go func() {
+		select {
+		case <-stream.Context().Done():
+			return
+		default:
+			for {
+				recv, err := stream.Recv()
+				if err != nil {
+					log.Error(err)
+				}
+				internalChan <- recv
+			}
+		}
+	}()
 	for {
 		select {
 		case <-stream.Context().Done():
 			grpc := protocol.GrpcID{Id: grpcID}
-			_, err = s.Close(context.Background(), &grpc)
+			_, err := s.Close(context.Background(), &grpc)
 			if err != nil {
 				log.Error(err)
 			}
 			return stream.Context().Err()
-		case st := <-ch:
-			stock := protocol.Stock{
-				Id:    st.ID,
-				Title: st.Title,
-				Price: st.Price,
-			}
-			err = stream.Send(&stock)
-			if err != nil {
-				log.Error(err)
+		case recv := <-internalChan:
+			switch {
+			case recv.Act == "INIT":
+				ch, err := s.rep.Send(recv.List, grpcID, externalChan)
+				if err != nil {
+					log.Error(err)
+				}
+				go func() {
+					for {
+						st, ok := <-ch
+						if !ok {
+							break
+						}
+						stock := protocol.Stock{
+							Id:    st.ID,
+							Title: st.Title,
+							Price: st.Price,
+						}
+						err = stream.Send(&stock)
+						if err != nil {
+							log.Error(err)
+						}
+					}
+				}()
+			case recv.Act == "ADD":
+				s.rep.Add(recv.List, grpcID, externalChan)
+			case recv.Act == "DEL":
+				s.rep.Del(recv.List, grpcID)
 			}
 		}
 	}

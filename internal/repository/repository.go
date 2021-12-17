@@ -28,10 +28,9 @@ func NewRepository(rdb *redis.Client, ch chan *model.Stock) *Repository {
 }
 
 // Send activates the stream, changing the flag to true
-func (r *Repository) Send(list []int32, grpcID string) (chan *model.Stock, error) {
+func (r *Repository) Send(list []int32, grpcID string, ch chan *model.Stock) (chan *model.Stock, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	ch := make(chan *model.Stock)
 	for _, stockID := range list {
 		grpc, ok := r.stock[stockID]
 		if !ok {
@@ -49,28 +48,37 @@ func (r *Repository) Send(list []int32, grpcID string) (chan *model.Stock, error
 	return ch, nil
 }
 
-// Send primary values from the database on client connection
-func sendPrimaryValues(rdb *redis.Client, stocks []int32, ch chan *model.Stock) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	for _, id := range stocks {
-		lastPrice, err := rdb.Get(ctx, strconv.Itoa(int(id))).Result()
-		if err != nil {
-			return err
+// Add func additionally subscribes to one or more stocks
+func (r *Repository) Add(list []int32, grpcID string, ch chan *model.Stock) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, stockID := range list {
+		grpc, ok := r.stock[stockID]
+		if !ok {
+			r.stock[stockID] = make(map[string]chan *model.Stock)
+			grpc = r.stock[stockID]
 		}
-		value, err := strconv.ParseFloat(lastPrice, 32)
-		if err != nil {
-			return err
-		}
-		v := float32(value)
-		stock := model.Stock{
-			ID:    id,
-			Title: "unknown",
-			Price: v,
-		}
-		ch <- &stock
+		grpc[grpcID] = ch
 	}
-	return nil
+	go func() {
+		err := sendPrimaryValues(r.rdb, list, ch)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+}
+
+// Del func unsubscribes from one or more stocks. It doesn't close the channel!
+func (r *Repository) Del(list []int32, grpcID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, StockID := range list {
+		grpc, ok := r.stock[StockID]
+		if !ok {
+			continue
+		}
+		delete(grpc, grpcID)
+	}
 }
 
 // Close func closes the channel and delete it from map
@@ -89,12 +97,14 @@ func (r *Repository) Close(grpcID string) error {
 	for _, stock := range r.stock {
 		delete(stock, grpcID)
 	}
-	close(ch)
+	if ch != nil {
+		close(ch)
+	}
 	return nil
 }
 
 // listen func listens redis stream and sends shares to the channel if it is active
-func (r *Repository)listen(ch chan *model.Stock) {
+func (r *Repository) listen(ch chan *model.Stock) {
 	var nextID = "$"
 	for {
 		entries, err := r.rdb.XRead(context.Background(), &redis.XReadArgs{
@@ -158,6 +168,30 @@ func (r *Repository)listen(ch chan *model.Stock) {
 			}
 		}()
 	}
+}
+
+// Send primary values from the database on client connection
+func sendPrimaryValues(rdb *redis.Client, stocks []int32, ch chan *model.Stock) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for _, id := range stocks {
+		lastPrice, err := rdb.Get(ctx, strconv.Itoa(int(id))).Result()
+		if err != nil {
+			return err
+		}
+		value, err := strconv.ParseFloat(lastPrice, 32)
+		if err != nil {
+			return err
+		}
+		v := float32(value)
+		stock := model.Stock{
+			ID:    id,
+			Title: "unknown",
+			Price: v,
+		}
+		ch <- &stock
+	}
+	return nil
 }
 
 // update func updates the latest price in the database

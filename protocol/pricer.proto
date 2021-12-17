@@ -5,7 +5,7 @@ option go_package = "github.com/chucky-1/pricer/protocol";
 package pgrpc;
 
 service Pricer {
-  rpc Send(ListID) returns (stream Stock) {}
+  rpc Send(stream StockID) returns (stream Stock) {}
   rpc Close(GrpcID) returns (Response) {}
 }
 
@@ -15,8 +15,9 @@ message Stock {
   float price = 3;
 }
 
-message ListID {
-  repeated int32 id = 1;
+message StockID {
+  string act = 1;
+  repeated int32 list = 2;
 }
 
 message GrpcID {
