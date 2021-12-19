@@ -14,7 +14,7 @@ import (
 
 // Server contains methods of application on service side
 type Server struct {
-	protocol.UnimplementedPricerServer
+	protocol.UnimplementedPricesServer
 	rep *repository.Repository
 }
 
@@ -23,8 +23,8 @@ func NewServer(rep *repository.Repository) *Server {
 	return &Server{rep: rep}
 }
 
-// Send listens on the channel and sends data to the client
-func (s *Server) Send(stream protocol.Pricer_SendServer) error {
+// Sub listens on the channel and sends data to the client
+func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 	grpcID := uuid.New().String()
 	internalChan := make(chan *protocol.StockID)
 	externalChan := make(chan *model.Stock)
@@ -34,7 +34,7 @@ func (s *Server) Send(stream protocol.Pricer_SendServer) error {
 		return err
 	}
 	if recv.Act == "INIT" {
-		s.rep.Send(recv.List, grpcID, externalChan)
+		s.rep.Sub(recv.List, grpcID, externalChan)
 		go func() {
 			for {
 				st, ok := <-externalChan

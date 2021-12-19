@@ -42,7 +42,7 @@ func main() {
 			log.Fatalf("failed to listen: %v", err)
 		}
 		s := grpc.NewServer()
-		protocol.RegisterPricerServer(s, server.NewServer(rep))
+		protocol.RegisterPricesServer(s, server.NewServer(rep))
 		log.Infof("server listening at %v", lis.Addr())
 		if err = s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
