@@ -41,9 +41,9 @@ func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 					break
 				}
 				stock := protocol.Stock{
-					Id:    st.ID,
-					Title: st.Title,
-					Price: st.Price,
+					Id:     st.ID,
+					Title:  st.Title,
+					Price:  st.Price,
 					Update: st.Update,
 				}
 				err = stream.Send(&stock)
@@ -91,6 +91,7 @@ func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 	}
 }
 
+// SubAll sends all stocks to the client
 func (s *Server) SubAll(r *protocol.Request, stream protocol.Prices_SubAllServer) error {
 	grpcID := uuid.New().String()
 	ch := make(chan *model.Stock)

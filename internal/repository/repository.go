@@ -69,7 +69,7 @@ func (r *Repository) Del(list []int32, grpcID string) {
 func (r *Repository) SubAll(grpcID string, ch chan *model.Stock) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	list := make([]int32, len(r.stock), len(r.stock))
+	list := make([]int32, len(r.stock))
 	for stockID, grpc := range r.stock {
 		_, ok := grpc[grpcID]
 		if !ok {
