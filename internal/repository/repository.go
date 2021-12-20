@@ -65,6 +65,26 @@ func (r *Repository) Del(list []int32, grpcID string) {
 	}
 }
 
+// SubAll subscribes on all stocks
+func (r *Repository) SubAll(grpcID string, ch chan *model.Stock) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	list := make([]int32, len(r.stock), len(r.stock))
+	for stockID, grpc := range r.stock {
+		_, ok := grpc[grpcID]
+		if !ok {
+			grpc[grpcID] = ch
+		}
+		list = append(list, stockID)
+	}
+	go func() {
+		err := sendPrimaryValues(r.rdb, list, ch)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+}
+
 // Close func closes the channel and delete it from map
 func (r *Repository) Close(grpcID string) error {
 	r.mu.Lock()
@@ -101,10 +121,6 @@ func (r *Repository) listen(ch chan *model.Stock) {
 			return
 		}
 		nextID = entries[0].Messages[0].ID
-		t, err := getTimeFromID(nextID)
-		if err != nil {
-			log.Error(err)
-		}
 		m := entries[0].Messages[0].Values
 		id, ok := m["ID"].(string)
 		if !ok {
@@ -130,7 +146,7 @@ func (r *Repository) listen(ch chan *model.Stock) {
 			ID:     int32(i),
 			Title:  title,
 			Price:  float32(p),
-			Update: t,
+			Update: nextID[:len(nextID)-2],
 		}
 
 		ch <- &stock
@@ -139,6 +155,14 @@ func (r *Repository) listen(ch chan *model.Stock) {
 		if err != nil {
 			log.Error(err)
 		}
+
+		// Init map for the stock
+		r.mu.Lock()
+		_, ok = r.stock[stock.ID]
+		if !ok {
+			r.stock[stock.ID] = make(map[string]chan *model.Stock)
+		}
+		r.mu.Unlock()
 
 		// Send the price in the channels
 		go func() {
@@ -187,13 +211,4 @@ func update(rdb *redis.Client, id string, price float32) error {
 		return err
 	}
 	return nil
-}
-
-func getTimeFromID(id string) (time.Time, error) {
-	mkr, err := strconv.Atoi(id[:len(id)-2])
-	if err != nil {
-		return time.Time{}, err
-	}
-	t := time.Unix(int64(mkr)/1000, 0)
-	return t, nil
 }

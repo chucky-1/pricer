@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
-	"context"
 	"errors"
 )
 
@@ -45,6 +44,7 @@ func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 					Id:    st.ID,
 					Title: st.Title,
 					Price: st.Price,
+					Update: st.Update,
 				}
 				err = stream.Send(&stock)
 				if err != nil {
@@ -75,8 +75,7 @@ func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 	for {
 		select {
 		case <-stream.Context().Done():
-			grpc := protocol.GrpcID{Id: grpcID}
-			_, err = s.Close(context.Background(), &grpc)
+			err = s.rep.Close(grpcID)
 			if err != nil {
 				log.Error(err)
 			}
@@ -92,11 +91,29 @@ func (s *Server) Sub(stream protocol.Prices_SubServer) error {
 	}
 }
 
-// Close func called when the client exits
-func (s *Server) Close(ctx context.Context, grpcID *protocol.GrpcID) (*protocol.Response, error) {
-	err := s.rep.Close(grpcID.Id)
-	if err != nil {
-		return nil, err
+func (s *Server) SubAll(r *protocol.Request, stream protocol.Prices_SubAllServer) error {
+	grpcID := uuid.New().String()
+	ch := make(chan *model.Stock)
+	s.rep.SubAll(grpcID, ch)
+	for {
+		select {
+		case <-stream.Context().Done():
+			err := s.rep.Close(grpcID)
+			if err != nil {
+				log.Error(err)
+			}
+			return stream.Context().Err()
+		case st := <-ch:
+			stock := protocol.Stock{
+				Id:     st.ID,
+				Title:  st.Title,
+				Price:  st.Price,
+				Update: st.Update,
+			}
+			err := stream.Send(&stock)
+			if err != nil {
+				log.Error(err)
+			}
+		}
 	}
-	return nil, nil
 }

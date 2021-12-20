@@ -18,8 +18,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PricesClient interface {
+	SubAll(ctx context.Context, in *Request, opts ...grpc.CallOption) (Prices_SubAllClient, error)
 	Sub(ctx context.Context, opts ...grpc.CallOption) (Prices_SubClient, error)
-	Close(ctx context.Context, in *GrpcID, opts ...grpc.CallOption) (*Response, error)
 }
 
 type pricesClient struct {
@@ -30,8 +30,40 @@ func NewPricesClient(cc grpc.ClientConnInterface) PricesClient {
 	return &pricesClient{cc}
 }
 
+func (c *pricesClient) SubAll(ctx context.Context, in *Request, opts ...grpc.CallOption) (Prices_SubAllClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[0], "/pgrpc.Prices/SubAll", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &pricesSubAllClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Prices_SubAllClient interface {
+	Recv() (*Stock, error)
+	grpc.ClientStream
+}
+
+type pricesSubAllClient struct {
+	grpc.ClientStream
+}
+
+func (x *pricesSubAllClient) Recv() (*Stock, error) {
+	m := new(Stock)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *pricesClient) Sub(ctx context.Context, opts ...grpc.CallOption) (Prices_SubClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[0], "/pgrpc.Prices/Sub", opts...)
+	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[1], "/pgrpc.Prices/Sub", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -61,21 +93,12 @@ func (x *pricesSubClient) Recv() (*Stock, error) {
 	return m, nil
 }
 
-func (c *pricesClient) Close(ctx context.Context, in *GrpcID, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/pgrpc.Prices/Close", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // PricesServer is the server API for Prices service.
 // All implementations must embed UnimplementedPricesServer
 // for forward compatibility
 type PricesServer interface {
+	SubAll(*Request, Prices_SubAllServer) error
 	Sub(Prices_SubServer) error
-	Close(context.Context, *GrpcID) (*Response, error)
 	mustEmbedUnimplementedPricesServer()
 }
 
@@ -83,11 +106,11 @@ type PricesServer interface {
 type UnimplementedPricesServer struct {
 }
 
+func (UnimplementedPricesServer) SubAll(*Request, Prices_SubAllServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubAll not implemented")
+}
 func (UnimplementedPricesServer) Sub(Prices_SubServer) error {
 	return status.Errorf(codes.Unimplemented, "method Sub not implemented")
-}
-func (UnimplementedPricesServer) Close(context.Context, *GrpcID) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
 func (UnimplementedPricesServer) mustEmbedUnimplementedPricesServer() {}
 
@@ -100,6 +123,27 @@ type UnsafePricesServer interface {
 
 func RegisterPricesServer(s grpc.ServiceRegistrar, srv PricesServer) {
 	s.RegisterService(&Prices_ServiceDesc, srv)
+}
+
+func _Prices_SubAll_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Request)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PricesServer).SubAll(m, &pricesSubAllServer{stream})
+}
+
+type Prices_SubAllServer interface {
+	Send(*Stock) error
+	grpc.ServerStream
+}
+
+type pricesSubAllServer struct {
+	grpc.ServerStream
+}
+
+func (x *pricesSubAllServer) Send(m *Stock) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _Prices_Sub_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -128,37 +172,19 @@ func (x *pricesSubServer) Recv() (*StockID, error) {
 	return m, nil
 }
 
-func _Prices_Close_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GrpcID)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PricesServer).Close(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pgrpc.Prices/Close",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PricesServer).Close(ctx, req.(*GrpcID))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Prices_ServiceDesc is the grpc.ServiceDesc for Prices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Prices_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "pgrpc.Prices",
 	HandlerType: (*PricesServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Close",
-			Handler:    _Prices_Close_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "SubAll",
+			Handler:       _Prices_SubAll_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "Sub",
 			Handler:       _Prices_Sub_Handler,
