@@ -39,9 +39,10 @@ func (r *Repository) Add(list []int32, grpcID string, ch chan *model.Symbol) {
 		mapWithChan, ok := r.channels[symbolID]
 		if !ok {
 			r.channels[symbolID] = make(map[string]chan *model.Symbol)
-			mapWithChan = r.channels[symbolID]
+			r.channels[symbolID][grpcID] = ch
+		} else {
+			mapWithChan[grpcID] = ch
 		}
-		mapWithChan[grpcID] = ch
 	}
 	go func() {
 		r.sendPrimaryValues(list, ch)
@@ -169,8 +170,8 @@ func (r *Repository)sendPrimaryValues(symbols []int32, ch chan *model.Symbol) {
 	for _, id := range symbols {
 		ch <- &model.Symbol{
 			ID: id,
-			Bid: r.symbols[id].Bid,
-			Ask: r.symbols[id].Ask,
+			Bid:  r.symbols[id].Bid,
+			Ask:  r.symbols[id].Ask,
 			Time: r.symbols[id].Time,
 		}
 	}

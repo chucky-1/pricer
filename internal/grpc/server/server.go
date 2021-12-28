@@ -7,6 +7,8 @@ import (
 	"github.com/chucky-1/pricer/protocol"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"strconv"
 )
 
 // Server contains methods of application on service side
@@ -27,17 +29,27 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 
 	go func() {
 		for {
-			symbol, ok := <-ch
-			if !ok {
-				break
-			}
-			err := stream.Send(&protocol.SubscribeResponse{
-				SymbolId: symbol.ID,
-				Bid: symbol.Bid,
-				Ask: symbol.Ask,
-			})
-			if err != nil {
-				log.Error(err)
+			select {
+			case <- stream.Context().Done():
+				return
+			default:
+				symbol, ok := <-ch
+				if !ok {
+					continue
+				}
+				time, err := decodeTime(symbol.Time)
+				if err != nil {
+					log.Error(err)
+				}
+				err = stream.Send(&protocol.SubscribeResponse{
+					SymbolId: symbol.ID,
+					Bid:      symbol.Bid,
+					Ask:      symbol.Ask,
+					Update:   &timestamppb.Timestamp{Seconds: time},
+				})
+				if err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}()
@@ -58,10 +70,26 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 			}
 			switch {
 			case recv.Action.String() == "ADD":
-				s.rep.Add(recv.SymbolId, grpcID, ch)
+				symbolIDList := make([]int32, 0, len(recv.SymbolId))
+				for _, symbolID := range recv.SymbolId {
+					symbolIDList = append(symbolIDList, symbolID)
+				}
+				s.rep.Add(symbolIDList, grpcID, ch)
 			case recv.Action.String() == "DEL":
-				s.rep.Del(recv.SymbolId, grpcID)
+				symbolIDList := make([]int32, 0, len(recv.SymbolId))
+				for _, symbolID := range symbolIDList {
+					symbolIDList = append(symbolIDList, symbolID)
+				}
+				s.rep.Del(symbolIDList, grpcID)
 			}
 		}
 	}
+}
+
+func decodeTime(time string) (int64, error) {
+	mkr, err := strconv.Atoi(time)
+	if err != nil {
+		return 0, err
+	}
+	return int64(mkr)/1000, nil
 }
