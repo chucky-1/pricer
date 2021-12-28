@@ -9,6 +9,7 @@ package protocol
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 )
@@ -20,19 +21,63 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Stock struct {
+type SubscribeRequest_Action int32
+
+const (
+	SubscribeRequest_ADD SubscribeRequest_Action = 0
+	SubscribeRequest_DEL SubscribeRequest_Action = 1
+)
+
+// Enum value maps for SubscribeRequest_Action.
+var (
+	SubscribeRequest_Action_name = map[int32]string{
+		0: "ADD",
+		1: "DEL",
+	}
+	SubscribeRequest_Action_value = map[string]int32{
+		"ADD": 0,
+		"DEL": 1,
+	}
+)
+
+func (x SubscribeRequest_Action) Enum() *SubscribeRequest_Action {
+	p := new(SubscribeRequest_Action)
+	*p = x
+	return p
+}
+
+func (x SubscribeRequest_Action) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SubscribeRequest_Action) Descriptor() protoreflect.EnumDescriptor {
+	return file_protocol_pricer_proto_enumTypes[0].Descriptor()
+}
+
+func (SubscribeRequest_Action) Type() protoreflect.EnumType {
+	return &file_protocol_pricer_proto_enumTypes[0]
+}
+
+func (x SubscribeRequest_Action) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SubscribeRequest_Action.Descriptor instead.
+func (SubscribeRequest_Action) EnumDescriptor() ([]byte, []int) {
+	return file_protocol_pricer_proto_rawDescGZIP(), []int{0, 0}
+}
+
+type SubscribeRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id     int32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Title  string  `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Price  float32 `protobuf:"fixed32,3,opt,name=price,proto3" json:"price,omitempty"`
-	Update string  `protobuf:"bytes,4,opt,name=update,proto3" json:"update,omitempty"`
+	Action   SubscribeRequest_Action `protobuf:"varint,1,opt,name=action,proto3,enum=pgrpc.SubscribeRequest_Action" json:"action,omitempty"`
+	SymbolId []int32                 `protobuf:"varint,2,rep,packed,name=symbol_id,json=symbolId,proto3" json:"symbol_id,omitempty"`
 }
 
-func (x *Stock) Reset() {
-	*x = Stock{}
+func (x *SubscribeRequest) Reset() {
+	*x = SubscribeRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_protocol_pricer_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -40,13 +85,13 @@ func (x *Stock) Reset() {
 	}
 }
 
-func (x *Stock) String() string {
+func (x *SubscribeRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Stock) ProtoMessage() {}
+func (*SubscribeRequest) ProtoMessage() {}
 
-func (x *Stock) ProtoReflect() protoreflect.Message {
+func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol_pricer_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -58,50 +103,38 @@ func (x *Stock) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Stock.ProtoReflect.Descriptor instead.
-func (*Stock) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
+func (*SubscribeRequest) Descriptor() ([]byte, []int) {
 	return file_protocol_pricer_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Stock) GetId() int32 {
+func (x *SubscribeRequest) GetAction() SubscribeRequest_Action {
 	if x != nil {
-		return x.Id
+		return x.Action
 	}
-	return 0
+	return SubscribeRequest_ADD
 }
 
-func (x *Stock) GetTitle() string {
+func (x *SubscribeRequest) GetSymbolId() []int32 {
 	if x != nil {
-		return x.Title
+		return x.SymbolId
 	}
-	return ""
+	return nil
 }
 
-func (x *Stock) GetPrice() float32 {
-	if x != nil {
-		return x.Price
-	}
-	return 0
-}
-
-func (x *Stock) GetUpdate() string {
-	if x != nil {
-		return x.Update
-	}
-	return ""
-}
-
-type StockID struct {
+type SubscribeResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Act  string  `protobuf:"bytes,1,opt,name=act,proto3" json:"act,omitempty"`
-	List []int32 `protobuf:"varint,2,rep,packed,name=list,proto3" json:"list,omitempty"`
+	SymbolId int32                  `protobuf:"varint,1,opt,name=symbol_id,json=symbolId,proto3" json:"symbol_id,omitempty"`
+	Bid      float32                `protobuf:"fixed32,2,opt,name=bid,proto3" json:"bid,omitempty"`
+	Ask      float32                `protobuf:"fixed32,3,opt,name=ask,proto3" json:"ask,omitempty"`
+	Update   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=update,proto3" json:"update,omitempty"`
 }
 
-func (x *StockID) Reset() {
-	*x = StockID{}
+func (x *SubscribeResponse) Reset() {
+	*x = SubscribeResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_protocol_pricer_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -109,13 +142,13 @@ func (x *StockID) Reset() {
 	}
 }
 
-func (x *StockID) String() string {
+func (x *SubscribeResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StockID) ProtoMessage() {}
+func (*SubscribeResponse) ProtoMessage() {}
 
-func (x *StockID) ProtoReflect() protoreflect.Message {
+func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol_pricer_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -127,87 +160,71 @@ func (x *StockID) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StockID.ProtoReflect.Descriptor instead.
-func (*StockID) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
+func (*SubscribeResponse) Descriptor() ([]byte, []int) {
 	return file_protocol_pricer_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *StockID) GetAct() string {
+func (x *SubscribeResponse) GetSymbolId() int32 {
 	if x != nil {
-		return x.Act
+		return x.SymbolId
 	}
-	return ""
+	return 0
 }
 
-func (x *StockID) GetList() []int32 {
+func (x *SubscribeResponse) GetBid() float32 {
 	if x != nil {
-		return x.List
+		return x.Bid
+	}
+	return 0
+}
+
+func (x *SubscribeResponse) GetAsk() float32 {
+	if x != nil {
+		return x.Ask
+	}
+	return 0
+}
+
+func (x *SubscribeResponse) GetUpdate() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Update
 	}
 	return nil
-}
-
-type Request struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *Request) Reset() {
-	*x = Request{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_protocol_pricer_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Request) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Request) ProtoMessage() {}
-
-func (x *Request) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_pricer_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Request.ProtoReflect.Descriptor instead.
-func (*Request) Descriptor() ([]byte, []int) {
-	return file_protocol_pricer_proto_rawDescGZIP(), []int{2}
 }
 
 var File_protocol_pricer_proto protoreflect.FileDescriptor
 
 var file_protocol_pricer_proto_rawDesc = []byte{
 	0x0a, 0x15, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2f, 0x70, 0x72, 0x69, 0x63, 0x65,
-	0x72, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x70, 0x67, 0x72, 0x70, 0x63, 0x22, 0x5b,
-	0x0a, 0x05, 0x53, 0x74, 0x6f, 0x63, 0x6b, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x05, 0x52, 0x02, 0x69, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65, 0x12, 0x14, 0x0a,
-	0x05, 0x70, 0x72, 0x69, 0x63, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x02, 0x52, 0x05, 0x70, 0x72,
-	0x69, 0x63, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x18, 0x04, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x06, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x22, 0x2f, 0x0a, 0x07, 0x53,
-	0x74, 0x6f, 0x63, 0x6b, 0x49, 0x44, 0x12, 0x10, 0x0a, 0x03, 0x61, 0x63, 0x74, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x03, 0x61, 0x63, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6c, 0x69, 0x73, 0x74,
-	0x18, 0x02, 0x20, 0x03, 0x28, 0x05, 0x52, 0x04, 0x6c, 0x69, 0x73, 0x74, 0x22, 0x09, 0x0a, 0x07,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x32, 0x5f, 0x0a, 0x06, 0x50, 0x72, 0x69, 0x63, 0x65,
-	0x73, 0x12, 0x2a, 0x0a, 0x06, 0x53, 0x75, 0x62, 0x41, 0x6c, 0x6c, 0x12, 0x0e, 0x2e, 0x70, 0x67,
-	0x72, 0x70, 0x63, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0c, 0x2e, 0x70, 0x67,
-	0x72, 0x70, 0x63, 0x2e, 0x53, 0x74, 0x6f, 0x63, 0x6b, 0x22, 0x00, 0x30, 0x01, 0x12, 0x29, 0x0a,
-	0x03, 0x53, 0x75, 0x62, 0x12, 0x0e, 0x2e, 0x70, 0x67, 0x72, 0x70, 0x63, 0x2e, 0x53, 0x74, 0x6f,
-	0x63, 0x6b, 0x49, 0x44, 0x1a, 0x0c, 0x2e, 0x70, 0x67, 0x72, 0x70, 0x63, 0x2e, 0x53, 0x74, 0x6f,
-	0x63, 0x6b, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x42, 0x25, 0x5a, 0x23, 0x67, 0x69, 0x74, 0x68,
-	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x68, 0x75, 0x63, 0x6b, 0x79, 0x2d, 0x31, 0x2f,
-	0x70, 0x72, 0x69, 0x63, 0x65, 0x72, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x72, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x70, 0x67, 0x72, 0x70, 0x63, 0x1a, 0x1f,
+	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f,
+	0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22,
+	0x83, 0x01, 0x0a, 0x10, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x36, 0x0a, 0x06, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0e, 0x32, 0x1e, 0x2e, 0x70, 0x67, 0x72, 0x70, 0x63, 0x2e, 0x53, 0x75, 0x62,
+	0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x2e, 0x41, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x06, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1b, 0x0a, 0x09,
+	0x73, 0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x03, 0x28, 0x05, 0x52,
+	0x08, 0x73, 0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x49, 0x64, 0x22, 0x1a, 0x0a, 0x06, 0x41, 0x63, 0x74,
+	0x69, 0x6f, 0x6e, 0x12, 0x07, 0x0a, 0x03, 0x41, 0x44, 0x44, 0x10, 0x00, 0x12, 0x07, 0x0a, 0x03,
+	0x44, 0x45, 0x4c, 0x10, 0x01, 0x22, 0x88, 0x01, 0x0a, 0x11, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72,
+	0x69, 0x62, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x73,
+	0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08,
+	0x73, 0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x49, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x62, 0x69, 0x64, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x02, 0x52, 0x03, 0x62, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x61, 0x73,
+	0x6b, 0x18, 0x03, 0x20, 0x01, 0x28, 0x02, 0x52, 0x03, 0x61, 0x73, 0x6b, 0x12, 0x32, 0x0a, 0x06,
+	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
+	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x06, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x32, 0x4e, 0x0a, 0x06, 0x50, 0x72, 0x69, 0x63, 0x65, 0x73, 0x12, 0x44, 0x0a, 0x09, 0x53, 0x75,
+	0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x12, 0x17, 0x2e, 0x70, 0x67, 0x72, 0x70, 0x63, 0x2e,
+	0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x1a, 0x18, 0x2e, 0x70, 0x67, 0x72, 0x70, 0x63, 0x2e, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
+	0x62, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01,
+	0x42, 0x25, 0x5a, 0x23, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63,
+	0x68, 0x75, 0x63, 0x6b, 0x79, 0x2d, 0x31, 0x2f, 0x70, 0x72, 0x69, 0x63, 0x65, 0x72, 0x2f, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -222,22 +239,24 @@ func file_protocol_pricer_proto_rawDescGZIP() []byte {
 	return file_protocol_pricer_proto_rawDescData
 }
 
-var file_protocol_pricer_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_protocol_pricer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_protocol_pricer_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_protocol_pricer_proto_goTypes = []interface{}{
-	(*Stock)(nil),   // 0: pgrpc.Stock
-	(*StockID)(nil), // 1: pgrpc.StockID
-	(*Request)(nil), // 2: pgrpc.Request
+	(SubscribeRequest_Action)(0),  // 0: pgrpc.SubscribeRequest.Action
+	(*SubscribeRequest)(nil),      // 1: pgrpc.SubscribeRequest
+	(*SubscribeResponse)(nil),     // 2: pgrpc.SubscribeResponse
+	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
 }
 var file_protocol_pricer_proto_depIdxs = []int32{
-	2, // 0: pgrpc.Prices.SubAll:input_type -> pgrpc.Request
-	1, // 1: pgrpc.Prices.Sub:input_type -> pgrpc.StockID
-	0, // 2: pgrpc.Prices.SubAll:output_type -> pgrpc.Stock
-	0, // 3: pgrpc.Prices.Sub:output_type -> pgrpc.Stock
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: pgrpc.SubscribeRequest.action:type_name -> pgrpc.SubscribeRequest.Action
+	3, // 1: pgrpc.SubscribeResponse.update:type_name -> google.protobuf.Timestamp
+	1, // 2: pgrpc.Prices.Subscribe:input_type -> pgrpc.SubscribeRequest
+	2, // 3: pgrpc.Prices.Subscribe:output_type -> pgrpc.SubscribeResponse
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_protocol_pricer_proto_init() }
@@ -247,7 +266,7 @@ func file_protocol_pricer_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_protocol_pricer_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Stock); i {
+			switch v := v.(*SubscribeRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -259,19 +278,7 @@ func file_protocol_pricer_proto_init() {
 			}
 		}
 		file_protocol_pricer_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StockID); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_protocol_pricer_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Request); i {
+			switch v := v.(*SubscribeResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -288,13 +295,14 @@ func file_protocol_pricer_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_protocol_pricer_proto_rawDesc,
-			NumEnums:      0,
-			NumMessages:   3,
+			NumEnums:      1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_protocol_pricer_proto_goTypes,
 		DependencyIndexes: file_protocol_pricer_proto_depIdxs,
+		EnumInfos:         file_protocol_pricer_proto_enumTypes,
 		MessageInfos:      file_protocol_pricer_proto_msgTypes,
 	}.Build()
 	File_protocol_pricer_proto = out.File

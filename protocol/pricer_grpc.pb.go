@@ -18,8 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PricesClient interface {
-	SubAll(ctx context.Context, in *Request, opts ...grpc.CallOption) (Prices_SubAllClient, error)
-	Sub(ctx context.Context, opts ...grpc.CallOption) (Prices_SubClient, error)
+	Subscribe(ctx context.Context, opts ...grpc.CallOption) (Prices_SubscribeClient, error)
 }
 
 type pricesClient struct {
@@ -30,63 +29,31 @@ func NewPricesClient(cc grpc.ClientConnInterface) PricesClient {
 	return &pricesClient{cc}
 }
 
-func (c *pricesClient) SubAll(ctx context.Context, in *Request, opts ...grpc.CallOption) (Prices_SubAllClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[0], "/pgrpc.Prices/SubAll", opts...)
+func (c *pricesClient) Subscribe(ctx context.Context, opts ...grpc.CallOption) (Prices_SubscribeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[0], "/pgrpc.Prices/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pricesSubAllClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
+	x := &pricesSubscribeClient{stream}
 	return x, nil
 }
 
-type Prices_SubAllClient interface {
-	Recv() (*Stock, error)
+type Prices_SubscribeClient interface {
+	Send(*SubscribeRequest) error
+	Recv() (*SubscribeResponse, error)
 	grpc.ClientStream
 }
 
-type pricesSubAllClient struct {
+type pricesSubscribeClient struct {
 	grpc.ClientStream
 }
 
-func (x *pricesSubAllClient) Recv() (*Stock, error) {
-	m := new(Stock)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *pricesClient) Sub(ctx context.Context, opts ...grpc.CallOption) (Prices_SubClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Prices_ServiceDesc.Streams[1], "/pgrpc.Prices/Sub", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &pricesSubClient{stream}
-	return x, nil
-}
-
-type Prices_SubClient interface {
-	Send(*StockID) error
-	Recv() (*Stock, error)
-	grpc.ClientStream
-}
-
-type pricesSubClient struct {
-	grpc.ClientStream
-}
-
-func (x *pricesSubClient) Send(m *StockID) error {
+func (x *pricesSubscribeClient) Send(m *SubscribeRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pricesSubClient) Recv() (*Stock, error) {
-	m := new(Stock)
+func (x *pricesSubscribeClient) Recv() (*SubscribeResponse, error) {
+	m := new(SubscribeResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -97,8 +64,7 @@ func (x *pricesSubClient) Recv() (*Stock, error) {
 // All implementations must embed UnimplementedPricesServer
 // for forward compatibility
 type PricesServer interface {
-	SubAll(*Request, Prices_SubAllServer) error
-	Sub(Prices_SubServer) error
+	Subscribe(Prices_SubscribeServer) error
 	mustEmbedUnimplementedPricesServer()
 }
 
@@ -106,11 +72,8 @@ type PricesServer interface {
 type UnimplementedPricesServer struct {
 }
 
-func (UnimplementedPricesServer) SubAll(*Request, Prices_SubAllServer) error {
-	return status.Errorf(codes.Unimplemented, "method SubAll not implemented")
-}
-func (UnimplementedPricesServer) Sub(Prices_SubServer) error {
-	return status.Errorf(codes.Unimplemented, "method Sub not implemented")
+func (UnimplementedPricesServer) Subscribe(Prices_SubscribeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedPricesServer) mustEmbedUnimplementedPricesServer() {}
 
@@ -125,47 +88,26 @@ func RegisterPricesServer(s grpc.ServiceRegistrar, srv PricesServer) {
 	s.RegisterService(&Prices_ServiceDesc, srv)
 }
 
-func _Prices_SubAll_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Request)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(PricesServer).SubAll(m, &pricesSubAllServer{stream})
+func _Prices_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PricesServer).Subscribe(&pricesSubscribeServer{stream})
 }
 
-type Prices_SubAllServer interface {
-	Send(*Stock) error
+type Prices_SubscribeServer interface {
+	Send(*SubscribeResponse) error
+	Recv() (*SubscribeRequest, error)
 	grpc.ServerStream
 }
 
-type pricesSubAllServer struct {
+type pricesSubscribeServer struct {
 	grpc.ServerStream
 }
 
-func (x *pricesSubAllServer) Send(m *Stock) error {
+func (x *pricesSubscribeServer) Send(m *SubscribeResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Prices_Sub_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PricesServer).Sub(&pricesSubServer{stream})
-}
-
-type Prices_SubServer interface {
-	Send(*Stock) error
-	Recv() (*StockID, error)
-	grpc.ServerStream
-}
-
-type pricesSubServer struct {
-	grpc.ServerStream
-}
-
-func (x *pricesSubServer) Send(m *Stock) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *pricesSubServer) Recv() (*StockID, error) {
-	m := new(StockID)
+func (x *pricesSubscribeServer) Recv() (*SubscribeRequest, error) {
+	m := new(SubscribeRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -181,13 +123,8 @@ var Prices_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "SubAll",
-			Handler:       _Prices_SubAll_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "Sub",
-			Handler:       _Prices_Sub_Handler,
+			StreamName:    "Subscribe",
+			Handler:       _Prices_Subscribe_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
