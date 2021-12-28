@@ -16,11 +16,11 @@ message SubscribeRequest {
     DEL = 1;
   }
   Action action = 1;
-  repeated int32 symbol_id = 2;
+  repeated int32 price_id = 2;
 }
 
 message SubscribeResponse {
-  int32 symbol_id = 1;
+  int32 price_id = 1;
   float bid = 2;
   float ask = 3;
   google.protobuf.Timestamp update = 4;

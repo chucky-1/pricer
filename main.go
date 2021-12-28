@@ -31,7 +31,7 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: hostAndPort})
 
 	// Initial dependencies
-	ch := make(chan *model.Symbol)
+	ch := make(chan *model.Price)
 	rep := repository.NewRepository(rdb, ch)
 
 	// Grpc
@@ -51,12 +51,12 @@ func main() {
 
 	// Business logic
 	for {
-		symbol := <-ch
-		err := validate.Struct(symbol)
+		price := <-ch
+		err := validate.Struct(price)
 		if err != nil {
 			log.Error("Struct isn't valid")
 		} else {
-			log.Infof("%d is update, new bid is %f, ask is %f, update time is %s", symbol.ID, symbol.Bid, symbol.Ask, symbol.Time)
+			log.Infof("%d is update, new bid is %f, ask is %f, update time is %s", price.ID, price.Bid, price.Ask, price.Time)
 		}
 	}
 }

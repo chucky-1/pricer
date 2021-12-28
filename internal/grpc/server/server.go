@@ -25,7 +25,7 @@ func NewServer(rep *repository.Repository) *Server {
 // Subscribe listens on the channel and sends data to the client
 func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 	grpcID := uuid.New().String()
-	ch := make(chan *model.Symbol)
+	ch := make(chan *model.Price)
 
 	go func() {
 		for {
@@ -33,19 +33,19 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 			case <- stream.Context().Done():
 				return
 			default:
-				symbol, ok := <-ch
+				price, ok := <-ch
 				if !ok {
 					continue
 				}
-				time, err := decodeTime(symbol.Time)
+				time, err := decodeTime(price.Time)
 				if err != nil {
 					log.Error(err)
 				}
 				err = stream.Send(&protocol.SubscribeResponse{
-					SymbolId: symbol.ID,
-					Bid:      symbol.Bid,
-					Ask:      symbol.Ask,
-					Update:   &timestamppb.Timestamp{Seconds: time},
+					PriceId: price.ID,
+					Bid:     price.Bid,
+					Ask:     price.Ask,
+					Update:  &timestamppb.Timestamp{Seconds: time},
 				})
 				if err != nil {
 					log.Error(err)
@@ -70,17 +70,17 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 			}
 			switch {
 			case recv.Action.String() == "ADD":
-				symbolIDList := make([]int32, 0, len(recv.SymbolId))
-				for _, symbolID := range recv.SymbolId {
-					symbolIDList = append(symbolIDList, symbolID)
+				priceID := make([]int32, 0, len(recv.PriceId))
+				for _, id := range recv.PriceId {
+					priceID = append(priceID, id)
 				}
-				s.rep.Add(symbolIDList, grpcID, ch)
+				s.rep.Add(priceID, grpcID, ch)
 			case recv.Action.String() == "DEL":
-				symbolIDList := make([]int32, 0, len(recv.SymbolId))
-				for _, symbolID := range symbolIDList {
-					symbolIDList = append(symbolIDList, symbolID)
+				priceID := make([]int32, 0, len(recv.PriceId))
+				for _, id := range priceID {
+					priceID = append(priceID, id)
 				}
-				s.rep.Del(symbolIDList, grpcID)
+				s.rep.Del(priceID, grpcID)
 			}
 		}
 	}

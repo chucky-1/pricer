@@ -1,4 +1,4 @@
-// Package repository receives current symbol prices and sends them to the channels
+// Package repository receives current prices and sends them to the channels
 package repository
 
 import (
@@ -15,46 +15,46 @@ import (
 type Repository struct {
 	rdb        *redis.Client
 	muChannels sync.RWMutex
-	channels   map[int32]map[string]chan *model.Symbol // map[symbol.ID]map[grpcID]chan
-	muSymbols  sync.RWMutex
-	symbols    map[int32]*model.Symbol // map[Symbol.ID]*symbol
+	channels   map[int32]map[string]chan *model.Price // map[price.ID]map[grpcID]chan
+	muPrices   sync.RWMutex
+	prices     map[int32]*model.Price // map[price.ID]*price
 }
 
 // NewRepository is constructor
-func NewRepository(rdb *redis.Client, ch chan *model.Symbol) *Repository {
+func NewRepository(rdb *redis.Client, ch chan *model.Price) *Repository {
 	rep := Repository{
 		rdb:      rdb,
-		channels: make(map[int32]map[string]chan *model.Symbol),
-		symbols:  make(map[int32]*model.Symbol),
+		channels: make(map[int32]map[string]chan *model.Price),
+		prices:  make(map[int32]*model.Price),
 	}
 	go rep.listen(ch)
 	return &rep
 }
 
 // Add is func initialization of stream
-func (r *Repository) Add(list []int32, grpcID string, ch chan *model.Symbol) {
+func (r *Repository) Add(priceID []int32, grpcID string, ch chan *model.Price) {
 	r.muChannels.Lock()
 	defer r.muChannels.Unlock()
-	for _, symbolID := range list {
-		mapWithChan, ok := r.channels[symbolID]
+	for _, id := range priceID {
+		mapWithChan, ok := r.channels[id]
 		if !ok {
-			r.channels[symbolID] = make(map[string]chan *model.Symbol)
-			r.channels[symbolID][grpcID] = ch
+			r.channels[id] = make(map[string]chan *model.Price)
+			r.channels[id][grpcID] = ch
 		} else {
 			mapWithChan[grpcID] = ch
 		}
 	}
 	go func() {
-		r.sendPrimaryValues(list, ch)
+		r.sendPrimaryValues(priceID, ch)
 	}()
 }
 
-// Del func unsubscribes from one or more symbols. It doesn't close the channel!
-func (r *Repository) Del(list []int32, grpcID string) {
+// Del func unsubscribes from one or more prices. It doesn't close the channel!
+func (r *Repository) Del(priceID []int32, grpcID string) {
 	r.muChannels.Lock()
 	defer r.muChannels.Unlock()
-	for _, symbolID := range list {
-		mapWithChan, ok := r.channels[symbolID]
+	for _, id := range priceID {
+		mapWithChan, ok := r.channels[id]
 		if !ok {
 			continue
 		}
@@ -66,17 +66,17 @@ func (r *Repository) Del(list []int32, grpcID string) {
 func (r *Repository) Close(grpcID string) error {
 	r.muChannels.Lock()
 	defer r.muChannels.Unlock()
-	var ch chan *model.Symbol
-	for _, symbol := range r.channels {
-		c, ok := symbol[grpcID]
+	var ch chan *model.Price
+	for _, mapWithChan := range r.channels {
+		c, ok := mapWithChan[grpcID]
 		if ok {
 			ch = c
-			delete(symbol, grpcID)
+			delete(mapWithChan, grpcID)
 			break
 		}
 	}
-	for _, symbol := range r.channels {
-		delete(symbol, grpcID)
+	for _, mapWithChan := range r.channels {
+		delete(mapWithChan, grpcID)
 	}
 	if ch != nil {
 		close(ch)
@@ -85,7 +85,7 @@ func (r *Repository) Close(grpcID string) error {
 }
 
 // listen func listens redis stream and sends shares to the channel if it is active
-func (r *Repository) listen(ch chan *model.Symbol) {
+func (r *Repository) listen(ch chan *model.Price) {
 	var nextID = "$"
 	for {
 		entries, err := r.rdb.XRead(context.Background(), &redis.XReadArgs{
@@ -123,22 +123,22 @@ func (r *Repository) listen(ch chan *model.Symbol) {
 		if err != nil {
 			log.Error(err)
 		}
-		symbol := model.Symbol{
+		price := model.Price{
 			ID:   int32(i),
 			Bid:  float32(b),
 			Ask:  float32(a),
 			Time: nextID[:len(nextID)-2],
 		}
 
-		ch <- &symbol
+		ch <- &price
 
-		r.update(&symbol)
+		r.update(&price)
 
-		// Init map for the symbols
+		// Init map for the price
 		r.muChannels.Lock()
-		_, ok = r.channels[symbol.ID]
+		_, ok = r.channels[price.ID]
 		if !ok {
-			r.channels[symbol.ID] = make(map[string]chan *model.Symbol)
+			r.channels[price.ID] = make(map[string]chan *model.Price)
 		}
 		r.muChannels.Unlock()
 
@@ -146,10 +146,10 @@ func (r *Repository) listen(ch chan *model.Symbol) {
 		go func() {
 			r.muChannels.RLock()
 			defer r.muChannels.RUnlock()
-			channels, ok := r.channels[symbol.ID]
+			channels, ok := r.channels[price.ID]
 			if ok {
 				for _, c := range channels {
-					c <- &symbol
+					c <- &price
 				}
 			}
 		}()
@@ -157,22 +157,22 @@ func (r *Repository) listen(ch chan *model.Symbol) {
 }
 
 // update func updates the latest price
-func (r *Repository)update(symbol *model.Symbol) {
-	r.muSymbols.Lock()
-	defer r.muSymbols.Unlock()
-	r.symbols[symbol.ID] = symbol
+func (r *Repository)update(price *model.Price) {
+	r.muPrices.Lock()
+	defer r.muPrices.Unlock()
+	r.prices[price.ID] = price
 }
 
-// Send primary values sends symbols into chan
-func (r *Repository)sendPrimaryValues(symbols []int32, ch chan *model.Symbol) {
-	r.muSymbols.RLock()
-	defer r.muSymbols.RUnlock()
-	for _, id := range symbols {
-		ch <- &model.Symbol{
+// Send primary values sends prices into chan
+func (r *Repository)sendPrimaryValues(priceID []int32, ch chan *model.Price) {
+	r.muPrices.RLock()
+	defer r.muPrices.RUnlock()
+	for _, id := range priceID {
+		ch <- &model.Price{
 			ID: id,
-			Bid:  r.symbols[id].Bid,
-			Ask:  r.symbols[id].Ask,
-			Time: r.symbols[id].Time,
+			Bid:  r.prices[id].Bid,
+			Ask:  r.prices[id].Ask,
+			Time: r.prices[id].Time,
 		}
 	}
 }
