@@ -42,7 +42,7 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 					log.Error(err)
 				}
 				err = stream.Send(&protocol.SubscribeResponse{
-					PriceId: price.ID,
+					SymbolId: price.ID.String(),
 					Bid:     price.Bid,
 					Ask:     price.Ask,
 					Update:  &timestamppb.Timestamp{Seconds: time},
@@ -68,15 +68,16 @@ func (s *Server) Subscribe(stream protocol.Prices_SubscribeServer) error {
 				log.Error(err)
 				continue
 			}
-			switch {
-			case recv.Action.String() == "ADD":
-				priceID := make([]int32, 0, len(recv.PriceId))
-				for _, id := range recv.PriceId {
-					priceID = append(priceID, id)
+			switch recv.Action.String() {
+			case "ADD":
+				priceID := make([]uuid.UUID, 0, len(recv.SymbolId))
+				for _, id := range recv.SymbolId {
+					uid, _ := uuid.FromBytes([]byte(id))
+					priceID = append(priceID, uid)
 				}
 				s.rep.Add(priceID, grpcID, ch)
-			case recv.Action.String() == "DEL":
-				priceID := make([]int32, 0, len(recv.PriceId))
+			case "DEL":
+				priceID := make([]uuid.UUID, 0, len(recv.SymbolId))
 				for _, id := range priceID {
 					priceID = append(priceID, id)
 				}

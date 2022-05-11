@@ -4,6 +4,7 @@ package repository
 import (
 	"github.com/chucky-1/pricer/internal/model"
 	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"context"
@@ -15,24 +16,24 @@ import (
 type Repository struct {
 	rdb        *redis.Client
 	muChannels sync.RWMutex
-	channels   map[int32]map[string]chan *model.Price // map[price.ID]map[grpcID]chan
+	channels   map[uuid.UUID]map[string]chan *model.Price // map[price.ID]map[grpcID]chan
 	muPrices   sync.RWMutex
-	prices     map[int32]*model.Price // map[price.ID]*price
+	prices     map[uuid.UUID]*model.Price // map[price.ID]*price
 }
 
 // NewRepository is constructor
 func NewRepository(rdb *redis.Client, ch chan *model.Price) *Repository {
 	rep := Repository{
 		rdb:      rdb,
-		channels: make(map[int32]map[string]chan *model.Price),
-		prices:  make(map[int32]*model.Price),
+		channels: make(map[uuid.UUID]map[string]chan *model.Price),
+		prices:  make(map[uuid.UUID]*model.Price),
 	}
 	go rep.listen(ch)
 	return &rep
 }
 
 // Add is func initialization of stream
-func (r *Repository) Add(priceID []int32, grpcID string, ch chan *model.Price) {
+func (r *Repository) Add(priceID []uuid.UUID, grpcID string, ch chan *model.Price) {
 	r.muChannels.Lock()
 	defer r.muChannels.Unlock()
 	for _, id := range priceID {
@@ -50,7 +51,7 @@ func (r *Repository) Add(priceID []int32, grpcID string, ch chan *model.Price) {
 }
 
 // Del func unsubscribes from one or more prices. It doesn't close the channel!
-func (r *Repository) Del(priceID []int32, grpcID string) {
+func (r *Repository) Del(priceID []uuid.UUID, grpcID string) {
 	r.muChannels.Lock()
 	defer r.muChannels.Unlock()
 	for _, id := range priceID {
@@ -103,7 +104,7 @@ func (r *Repository) listen(ch chan *model.Price) {
 		if !ok {
 			log.Error("id is missing")
 		}
-		i, err := strconv.Atoi(id)
+		uid, err := uuid.FromBytes([]byte(id))
 		if err != nil {
 			log.Error(err)
 		}
@@ -124,7 +125,7 @@ func (r *Repository) listen(ch chan *model.Price) {
 			log.Error(err)
 		}
 		price := model.Price{
-			ID:   int32(i),
+			ID:   uid,
 			Bid:  float32(b),
 			Ask:  float32(a),
 			Time: nextID[:len(nextID)-2],
@@ -164,7 +165,7 @@ func (r *Repository)update(price *model.Price) {
 }
 
 // Send primary values sends prices into chan
-func (r *Repository)sendPrimaryValues(priceID []int32, ch chan *model.Price) {
+func (r *Repository)sendPrimaryValues(priceID []uuid.UUID, ch chan *model.Price) {
 	r.muPrices.RLock()
 	defer r.muPrices.RUnlock()
 	for _, id := range priceID {
